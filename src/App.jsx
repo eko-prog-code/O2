@@ -5,7 +5,7 @@ import './App.css';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 
 // Icons dari lucide-react
-import { Copy, Search, RefreshCw, Wind, Droplets, Activity, Globe, ExternalLink, Fingerprint, ArrowUp, ArrowDown, Calendar, Clock, Wallet, TrendingUp, TrendingDown, Filter } from 'lucide-react';
+import { Copy, Search, RefreshCw, Wind, Droplets, Activity, Globe, ExternalLink, Fingerprint, ArrowUp, ArrowDown, Calendar, Clock, Wallet, TrendingUp, TrendingDown, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Contract ABI - SESUAI DENGAN SMART CONTRACT YANG BARU
 const contractABI = [
@@ -149,6 +149,7 @@ const App = () => {
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('all'); // 'all', 'incoming', 'outgoing'
   const [showTransactionDetails, setShowTransactionDetails] = useState(false);
+  const [showAllTransactions, setShowAllTransactions] = useState(false); // State baru untuk toggle show all
   
   // State lainnya
   const [newTagline, setNewTagline] = useState('');
@@ -276,7 +277,8 @@ const App = () => {
                 to.toLowerCase() === trackAddress?.toLowerCase() ? 'incoming' : 'other'
         };
         
-        setTransactions(prev => [newTransaction, ...prev].slice(0, 50)); // Keep last 50
+        // Simpan maksimal 100 transaksi terbaru
+        setTransactions(prev => [newTransaction, ...prev].slice(0, 100));
       });
 
       // Setup event listeners
@@ -304,11 +306,29 @@ const App = () => {
     }
   }, [searchTerm, holders]);
 
-  // Filter transactions berdasarkan type
+  // Filter transactions berdasarkan type dan limit ke 3 transaksi terbaru
   const filteredTransactions = React.useMemo(() => {
-    if (transactionTypeFilter === 'all') return transactions;
-    return transactions.filter(tx => tx.type === transactionTypeFilter);
+    let filtered = transactions;
+    
+    // Filter berdasarkan type
+    if (transactionTypeFilter !== 'all') {
+      filtered = filtered.filter(tx => tx.type === transactionTypeFilter);
+    }
+    
+    return filtered;
   }, [transactions, transactionTypeFilter]);
+
+  // Ambil hanya 3 transaksi terbaru untuk ditampilkan (kecuali jika showAllTransactions true)
+  const displayedTransactions = React.useMemo(() => {
+    if (showAllTransactions) {
+      return filteredTransactions;
+    }
+    // Ambil hanya 3 transaksi terbaru
+    return filteredTransactions.slice(0, 3);
+  }, [filteredTransactions, showAllTransactions]);
+
+  // Hitung jumlah transaksi yang lebih dari 3
+  const hasMoreTransactions = filteredTransactions.length > 3;
 
   const loadTokenInfo = async (contractInstance) => {
     try {
@@ -485,6 +505,7 @@ const App = () => {
     
     await loadTransactionHistory(trackAddress);
     setShowTransactionDetails(true);
+    setShowAllTransactions(false); // Reset ke tampilan 3 transaksi saat melacak baru
   };
 
   // Fungsi untuk menggunakan address saat ini (jika wallet terkoneksi)
@@ -500,6 +521,12 @@ const App = () => {
     setTransactions([]);
     setShowTransactionDetails(false);
     setTransactionTypeFilter('all');
+    setShowAllTransactions(false); // Reset toggle
+  };
+
+  // Fungsi untuk toggle show all transactions
+  const toggleShowAllTransactions = () => {
+    setShowAllTransactions(!showAllTransactions);
   };
 
   const connectWallet = async () => {
@@ -983,79 +1010,105 @@ const App = () => {
                     <div className="spinner"></div>
                     <p>Memuat riwayat transaksi...</p>
                   </div>
-                ) : filteredTransactions.length > 0 ? (
-                  <div className="transactions-list">
-                    {filteredTransactions.map((tx, index) => {
-                      const timeInfo = formatTimestamp(tx.timestamp);
-                      const isIncoming = tx.type === 'incoming';
-                      
-                      return (
-                        <div 
-                          key={`${tx.hash}-${index}`} 
-                          className={`transaction-item ${isIncoming ? 'incoming' : 'outgoing'}`}
-                          onClick={() => openTransactionInExplorer(tx.hash)}
-                          title="Klik untuk lihat di blockchain explorer"
-                        >
-                          <div className="transaction-icon">
-                            {isIncoming ? (
-                              <div className="icon-circle incoming">
-                                <ArrowDown size={16} />
+                ) : displayedTransactions.length > 0 ? (
+                  <>
+                    <div className="transactions-list">
+                      {displayedTransactions.map((tx, index) => {
+                        const timeInfo = formatTimestamp(tx.timestamp);
+                        const isIncoming = tx.type === 'incoming';
+                        
+                        return (
+                          <div 
+                            key={`${tx.hash}-${index}`} 
+                            className={`transaction-item ${isIncoming ? 'incoming' : 'outgoing'}`}
+                            onClick={() => openTransactionInExplorer(tx.hash)}
+                            title="Klik untuk lihat di blockchain explorer"
+                          >
+                            <div className="transaction-icon">
+                              {isIncoming ? (
+                                <div className="icon-circle incoming">
+                                  <ArrowDown size={16} />
+                                </div>
+                              ) : (
+                                <div className="icon-circle outgoing">
+                                  <ArrowUp size={16} />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="transaction-details">
+                              <div className="transaction-addresses">
+                                <div className="address-from">
+                                  <span className="label">Dari:</span>
+                                  <span className="address">{tx.from.substring(0, 8)}...{tx.from.substring(tx.from.length - 6)}</span>
+                                </div>
+                                <div className="address-to">
+                                  <span className="label">Ke:</span>
+                                  <span className="address">{tx.to.substring(0, 8)}...{tx.to.substring(tx.to.length - 6)}</span>
+                                </div>
                               </div>
-                            ) : (
-                              <div className="icon-circle outgoing">
-                                <ArrowUp size={16} />
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="transaction-details">
-                            <div className="transaction-addresses">
-                              <div className="address-from">
-                                <span className="label">Dari:</span>
-                                <span className="address">{tx.from.substring(0, 8)}...{tx.from.substring(tx.from.length - 6)}</span>
-                              </div>
-                              <div className="address-to">
-                                <span className="label">Ke:</span>
-                                <span className="address">{tx.to.substring(0, 8)}...{tx.to.substring(tx.to.length - 6)}</span>
+                              
+                              <div className="transaction-info">
+                                <div className="transaction-amount">
+                                  <span className="amount">{formatBalance(tx.value, 4)} O2</span>
+                                  <span className={`amount-type ${isIncoming ? 'incoming' : 'outgoing'}`}>
+                                    {isIncoming ? '+' : '-'}
+                                  </span>
+                                </div>
+                                
+                                <div className="transaction-time">
+                                  <div className="time-item">
+                                    <Calendar size={12} />
+                                    <span>{timeInfo.date}</span>
+                                  </div>
+                                  <div className="time-item">
+                                    <Clock size={12} />
+                                    <span>{timeInfo.time}</span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                             
-                            <div className="transaction-info">
-                              <div className="transaction-amount">
-                                <span className="amount">{formatBalance(tx.value, 4)} O2</span>
-                                <span className={`amount-type ${isIncoming ? 'incoming' : 'outgoing'}`}>
-                                  {isIncoming ? '+' : '-'}
-                                </span>
-                              </div>
-                              
-                              <div className="transaction-time">
-                                <div className="time-item">
-                                  <Calendar size={12} />
-                                  <span>{timeInfo.date}</span>
-                                </div>
-                                <div className="time-item">
-                                  <Clock size={12} />
-                                  <span>{timeInfo.time}</span>
-                                </div>
-                              </div>
+                            <div className="transaction-actions">
+                              <button 
+                                className="view-tx-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTransactionInExplorer(tx.hash);
+                                }}
+                              >
+                                <ExternalLink size={14} />
+                              </button>
                             </div>
                           </div>
-                          
-                          <div className="transaction-actions">
-                            <button 
-                              className="view-tx-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openTransactionInExplorer(tx.hash);
-                              }}
-                            >
-                              <ExternalLink size={14} />
-                            </button>
-                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Tombol Show More/Less untuk transaksi */}
+                    {hasMoreTransactions && (
+                      <div className="show-more-transactions">
+                        <button 
+                          onClick={toggleShowAllTransactions}
+                          className="show-more-transactions-btn"
+                          disabled={isLoading}
+                        >
+                          {showAllTransactions ? (
+                            <>
+                              <ChevronUp size={16} /> Tampilkan Sedikit (3 Transaksi Terbaru)
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown size={16} /> Tampilkan Semua ({filteredTransactions.length} Transaksi)
+                            </>
+                          )}
+                        </button>
+                        <div className="transactions-count">
+                          Menampilkan {displayedTransactions.length} dari {filteredTransactions.length} transaksi
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="no-transactions">
                     <p>❌ Tidak ada transaksi ditemukan untuk alamat ini.</p>
@@ -1063,7 +1116,7 @@ const App = () => {
                   </div>
                 )}
                 
-                {filteredTransactions.length > 0 && (
+                {displayedTransactions.length > 0 && (
                   <div className="transaction-stats">
                     <div className="stat-item">
                       <div className="stat-icon incoming">
@@ -1341,4 +1394,3 @@ const App = () => {
 };
 
 export default App;
-
