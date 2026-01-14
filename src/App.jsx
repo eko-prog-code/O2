@@ -1387,6 +1387,7 @@ const App = () => {
           <p className="footer-note">
             Breathe life into the ecosystem. Real-time updates on oxygen distribution.
           </p>
+          <p>"Use Sepolia Testnet"</p>
         </footer>
       </div>
     </>
