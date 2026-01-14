@@ -915,7 +915,7 @@ const App = () => {
 
           {/* Lacak Transaksi Section - BARU */}
           <section className="track-transactions-section">
-            <h2>🌬️ Lacak Transaksi</h2>
+            <h2> Lacak Transaksi</h2>
             
             <div className="track-transactions-form">
               <div className="track-input-group">
