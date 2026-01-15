@@ -7,18 +7,17 @@ import { CopyToClipboard } from 'react-copy-to-clipboard';
 // Icons dari lucide-react
 import { Copy, Search, RefreshCw, Wind, Droplets, Activity, Globe, ExternalLink, Fingerprint, ArrowUp, ArrowDown, Calendar, Clock, Wallet, TrendingUp, TrendingDown, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 
-// Contract ABI - SESUAI DENGAN SMART CONTRACT YANG BARU
+// Contract ABI - UPDATE UNTUK KONTRAK VERSI BARU
 const contractABI = [
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
-  "function totalSupply() view returns (uint256)",
+  // Fungsi dasar ERC20
   "function balanceOf(address) view returns (uint256)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function approve(address spender, uint256 amount) returns (bool)",
+  "function totalSupply() view returns (uint256)",
+  "function transfer(address to, uint256 amount)",
+  "function approve(address spender, uint256 amount)",
   "function allowance(address owner, address spender) view returns (uint256)",
-  "function transferFrom(address from, address to, uint256 amount) returns (bool)",
-  "function owner() view returns (address)",
+  "function transferFrom(address from, address to, uint256 amount)",
+  
+  // Fungsi custom
   "function paused() view returns (bool)",
   "function taxFee() view returns (uint256)",
   "function setTaxFee(uint256 newTaxFee)",
@@ -34,13 +33,14 @@ const contractABI = [
   "function getTagline() view returns (string)",
   "function updateTagline(string memory newTagline)",
   "function getTokenInfo() view returns (string, string, uint256, uint256, uint256, string, address)",
+  
+  // Event
   "event Transfer(address indexed from, address indexed to, uint256 value)"
 ];
 
 // RPC Configuration
 const RPC_URL = "https://ethereum-sepolia.publicnode.com";
-// GANTI DENGAN ALAMAT KONTRAK O2 YANG BARU
-const CONTRACT_ADDRESS = "0xc3995327C271697C468a5bc03E708D43Ba07BEA4"; // Update setelah deploy
+const CONTRACT_ADDRESS = "0xc3995327C271697C468a5bc03E708D43Ba07BEA4";
 
 // Blockchain Explorer URL
 const BLOCKCHAIN_EXPLORER_URL = `https://eth-sepolia.blockscout.com/token/${CONTRACT_ADDRESS}?tab=contract`;
@@ -49,18 +49,13 @@ const BLOCKCHAIN_EXPLORER_URL = `https://eth-sepolia.blockscout.com/token/${CONT
 const formatNumber = (num) => {
   if (!num) return '0';
   
-  // Jika input adalah string, konversi ke number
   const number = typeof num === 'string' ? parseFloat(num) : num;
-  
-  // Pisah bagian integer dan desimal
   const parts = number.toString().split('.');
   const integerPart = parts[0];
   const decimalPart = parts[1] || '';
   
-  // Format integer part dengan pemisah ribuan
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   
-  // Gabungkan dengan desimal jika ada
   return decimalPart ? `${formattedInteger},${decimalPart}` : formattedInteger;
 };
 
@@ -71,12 +66,10 @@ const formatBalance = (balance, decimals = 4) => {
     
     const balanceNumber = parseFloat(balance);
     
-    // Jika saldo sangat kecil (< 0.0001), tampilkan dengan notasi ilmiah
     if (balanceNumber < 0.0001 && balanceNumber > 0) {
       return balanceNumber.toExponential(6);
     }
     
-    // Untuk saldo normal, format dengan desimal
     const options = {
       minimumFractionDigits: 0,
       maximumFractionDigits: decimals,
@@ -95,12 +88,10 @@ const formatTimestamp = (timestamp) => {
   
   const date = new Date(timestamp * 1000);
   
-  // Format tanggal
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
   
-  // Format waktu
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
   const seconds = date.getSeconds().toString().padStart(2, '0');
@@ -127,8 +118,8 @@ const App = () => {
   
   // State untuk token info
   const [tokenInfo, setTokenInfo] = useState({
-    name: '',
-    symbol: '',
+    name: 'O2 Token',
+    symbol: 'O2',
     totalSupply: '',
     taxFee: '',
     owner: ''
@@ -147,9 +138,9 @@ const App = () => {
   const [trackAddress, setTrackAddress] = useState('');
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState('all'); // 'all', 'incoming', 'outgoing'
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
   const [showTransactionDetails, setShowTransactionDetails] = useState(false);
-  const [showAllTransactions, setShowAllTransactions] = useState(false); // State baru untuk toggle show all
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
   
   // State lainnya
   const [newTagline, setNewTagline] = useState('');
@@ -180,6 +171,9 @@ const App = () => {
           web3Provider
         );
         setContract(tokenContract);
+        
+        console.log("Contract initialized:", tokenContract);
+        
         await loadTokenInfo(tokenContract);
         
         // Load holders saat pertama kali
@@ -205,7 +199,6 @@ const App = () => {
       setShowSplash(false);
     }, 14000);
     
-    // Cleanup event listener
     return () => {
       if (eventListenerRef.current && window.ethereum) {
         window.ethereum.removeListener('accountsChanged', eventListenerRef.current);
@@ -227,8 +220,13 @@ const App = () => {
           await loadBalance(newAccount, contract);
           
           // Check if still owner
-          const ownerAddress = await contract.owner();
-          setIsOwner(ownerAddress.toLowerCase() === newAccount.toLowerCase());
+          try {
+            const [, , , , , , tokenOwner] = await contract.getTokenInfo();
+            setIsOwner(tokenOwner.toLowerCase() === newAccount.toLowerCase());
+          } catch (error) {
+            console.error("Error checking owner:", error);
+            setIsOwner(false);
+          }
           
           // Jika ada address yang sedang di-track, refresh transaksi
           if (trackAddress) {
@@ -266,19 +264,22 @@ const App = () => {
         }
         
         // Tambahkan transaksi baru ke state jika perlu
-        const newTransaction = {
-          hash: event.transactionHash,
-          from: from,
-          to: to,
-          value: ethers.formatUnits(value, await contract.decimals()),
-          timestamp: Date.now() / 1000, // Approximate timestamp
-          blockNumber: event.blockNumber,
-          type: from.toLowerCase() === trackAddress?.toLowerCase() ? 'outgoing' : 
-                to.toLowerCase() === trackAddress?.toLowerCase() ? 'incoming' : 'other'
-        };
-        
-        // Simpan maksimal 100 transaksi terbaru
-        setTransactions(prev => [newTransaction, ...prev].slice(0, 100));
+        try {
+          const newTransaction = {
+            hash: event.transactionHash,
+            from: from,
+            to: to,
+            value: ethers.formatUnits(value, 4), // Hardcode decimals = 4
+            timestamp: Date.now() / 1000,
+            blockNumber: event.blockNumber,
+            type: from.toLowerCase() === trackAddress?.toLowerCase() ? 'outgoing' : 
+                  to.toLowerCase() === trackAddress?.toLowerCase() ? 'incoming' : 'other'
+          };
+          
+          setTransactions(prev => [newTransaction, ...prev].slice(0, 100));
+        } catch (error) {
+          console.error("Error adding new transaction:", error);
+        }
       });
 
       // Setup event listeners
@@ -306,11 +307,10 @@ const App = () => {
     }
   }, [searchTerm, holders]);
 
-  // Filter transactions berdasarkan type dan limit ke 3 transaksi terbaru
+  // Filter transactions
   const filteredTransactions = React.useMemo(() => {
     let filtered = transactions;
     
-    // Filter berdasarkan type
     if (transactionTypeFilter !== 'all') {
       filtered = filtered.filter(tx => tx.type === transactionTypeFilter);
     }
@@ -318,40 +318,68 @@ const App = () => {
     return filtered;
   }, [transactions, transactionTypeFilter]);
 
-  // Ambil hanya 3 transaksi terbaru untuk ditampilkan (kecuali jika showAllTransactions true)
   const displayedTransactions = React.useMemo(() => {
     if (showAllTransactions) {
       return filteredTransactions;
     }
-    // Ambil hanya 3 transaksi terbaru
     return filteredTransactions.slice(0, 3);
   }, [filteredTransactions, showAllTransactions]);
 
-  // Hitung jumlah transaksi yang lebih dari 3
   const hasMoreTransactions = filteredTransactions.length > 3;
 
   const loadTokenInfo = async (contractInstance) => {
     try {
-      const name = await contractInstance.name();
-      const symbol = await contractInstance.symbol();
-      const totalSupply = await contractInstance.totalSupply();
-      const decimals = await contractInstance.decimals();
-      const taxFee = await contractInstance.taxFee();
-      const tagline = await contractInstance.getTagline();
-      const owner = await contractInstance.owner();
+      console.log("Loading token info...");
       
-      setTokenInfo({
-        name,
-        symbol,
-        totalSupply: ethers.formatUnits(totalSupply, decimals),
-        taxFee: ethers.formatUnits(taxFee, 2) + '%',
-        owner
-      });
-      
-      setTagline(tagline);
+      // Coba gunakan getTokenInfo() terlebih dahulu
+      try {
+        const [name, symbol, tokenSupply, maxSupply, currentTaxFee, currentTagline, tokenOwner] = 
+          await contractInstance.getTokenInfo();
+        
+        console.log("Token info from getTokenInfo():", {
+          name, symbol, tokenSupply: tokenSupply.toString(),
+          currentTaxFee: currentTaxFee.toString()
+        });
+        
+        setTokenInfo({
+          name: name || 'O2 Token',
+          symbol: symbol || 'O2',
+          totalSupply: ethers.formatUnits(tokenSupply, 4),
+          taxFee: ethers.formatUnits(currentTaxFee, 2) + '%',
+          owner: tokenOwner
+        });
+        
+        setTagline(currentTagline || tagline);
+        
+      } catch (error) {
+        console.log("getTokenInfo() failed, trying fallback...", error);
+        
+        // Fallback: ambil data satu per satu
+        const totalSupply = await contractInstance.totalSupply();
+        const taxFee = await contractInstance.taxFee();
+        const taglineResult = await contractInstance.getTagline();
+        
+        setTokenInfo({
+          name: 'O2 Token',
+          symbol: 'O2',
+          totalSupply: ethers.formatUnits(totalSupply, 4),
+          taxFee: ethers.formatUnits(taxFee, 2) + '%',
+          owner: ''
+        });
+        
+        setTagline(taglineResult || tagline);
+      }
       
     } catch (error) {
       console.error("Error loading token info:", error);
+      // Set default values
+      setTokenInfo({
+        name: 'O2 Token',
+        symbol: 'O2',
+        totalSupply: '0',
+        taxFee: '0.05%',
+        owner: ''
+      });
     }
   };
 
@@ -359,17 +387,20 @@ const App = () => {
   const loadAllTokenHolders = async (contractInstance) => {
     try {
       setLoadingHolders(true);
+      console.log("Loading token holders...");
       
       // Gunakan fungsi getAllTokenHolders dari smart contract
-      const [addresses, balances] = await contractInstance.getAllTokenHolders();
-      const decimals = await contractInstance.decimals();
+      const result = await contractInstance.getAllTokenHolders();
+      console.log("getAllTokenHolders result:", result);
+      
+      const [addresses, balances] = result;
       
       const holdersList = [];
       
       for (let i = 0; i < addresses.length; i++) {
         const address = addresses[i];
         const balanceWei = balances[i];
-        const balanceFormatted = ethers.formatUnits(balanceWei, decimals);
+        const balanceFormatted = ethers.formatUnits(balanceWei, 4); // decimals = 4
         
         holdersList.push({
           address: address,
@@ -386,12 +417,18 @@ const App = () => {
       setFilteredHolders(holdersList);
       
       // Get holders count
-      const count = await contractInstance.getHoldersCount();
-      setHoldersCount(Number(count));
+      try {
+        const count = await contractInstance.getHoldersCount();
+        setHoldersCount(Number(count));
+      } catch (error) {
+        setHoldersCount(holdersList.length);
+      }
+      
+      console.log(`Loaded ${holdersList.length} holders`);
       
     } catch (error) {
       console.error("Error loading token holders:", error);
-      // Fallback: coba load dari events jika fungsi tidak tersedia
+      // Fallback: coba load dari events
       await loadHoldersFromEvents(contractInstance);
     } finally {
       setLoadingHolders(false);
@@ -401,15 +438,15 @@ const App = () => {
   // Fallback function jika getAllTokenHolders tidak tersedia
   const loadHoldersFromEvents = async (contractInstance) => {
     try {
+      console.log("Trying to load holders from events...");
       const filter = contractInstance.filters.Transfer();
       const events = await contractInstance.queryFilter(filter, 0, 'latest');
       
       const balancesMap = new Map();
-      const decimals = await contractInstance.decimals();
       
       events.forEach(event => {
         const { from, to, value } = event.args;
-        const valueNum = Number(ethers.formatUnits(value, decimals));
+        const valueNum = Number(ethers.formatUnits(value, 4));
         
         if (from !== ethers.ZeroAddress) {
           const fromBalance = balancesMap.get(from) || 0;
@@ -437,6 +474,8 @@ const App = () => {
       setFilteredHolders(holdersList);
       setHoldersCount(holdersList.length);
       
+      console.log(`Loaded ${holdersList.length} holders from events`);
+      
     } catch (error) {
       console.error("Error loading holders from events:", error);
     }
@@ -453,7 +492,6 @@ const App = () => {
       const filter = contract.filters.Transfer();
       const events = await contract.queryFilter(filter, 0, 'latest');
       
-      const decimals = await contract.decimals();
       const transactionList = [];
       
       // Filter events yang melibatkan address yang dicari
@@ -463,13 +501,19 @@ const App = () => {
         if (from.toLowerCase() === address.toLowerCase() || 
             to.toLowerCase() === address.toLowerCase()) {
           
-          const block = await event.getBlock();
+          let block;
+          try {
+            block = await event.getBlock();
+          } catch (error) {
+            console.log("Could not get block, using current time");
+            block = { timestamp: Math.floor(Date.now() / 1000), number: 0 };
+          }
           
           transactionList.push({
             hash: event.transactionHash,
             from: from,
             to: to,
-            value: ethers.formatUnits(value, decimals),
+            value: ethers.formatUnits(value, 4),
             timestamp: block.timestamp,
             blockNumber: block.number,
             type: from.toLowerCase() === address.toLowerCase() ? 'outgoing' : 'incoming'
@@ -481,6 +525,7 @@ const App = () => {
       transactionList.sort((a, b) => b.timestamp - a.timestamp);
       
       setTransactions(transactionList);
+      console.log(`Loaded ${transactionList.length} transactions for ${address}`);
       
     } catch (error) {
       console.error("Error loading transaction history:", error);
@@ -497,7 +542,6 @@ const App = () => {
       return;
     }
     
-    // Validasi format address
     if (!ethers.isAddress(trackAddress)) {
       alert('Format alamat tidak valid. Harap masukkan alamat wallet yang valid.');
       return;
@@ -505,26 +549,23 @@ const App = () => {
     
     await loadTransactionHistory(trackAddress);
     setShowTransactionDetails(true);
-    setShowAllTransactions(false); // Reset ke tampilan 3 transaksi saat melacak baru
+    setShowAllTransactions(false);
   };
 
-  // Fungsi untuk menggunakan address saat ini (jika wallet terkoneksi)
   const useCurrentAddress = () => {
     if (account) {
       setTrackAddress(account);
     }
   };
 
-  // Fungsi untuk mengosongkan pencarian transaksi
   const clearTransactionSearch = () => {
     setTrackAddress('');
     setTransactions([]);
     setShowTransactionDetails(false);
     setTransactionTypeFilter('all');
-    setShowAllTransactions(false); // Reset toggle
+    setShowAllTransactions(false);
   };
 
-  // Fungsi untuk toggle show all transactions
   const toggleShowAllTransactions = () => {
     setShowAllTransactions(!showAllTransactions);
   };
@@ -551,8 +592,14 @@ const App = () => {
       const contractWithSigner = contract.connect(signerInstance);
       setContract(contractWithSigner);
       
-      const ownerAddress = await contractWithSigner.owner();
-      setIsOwner(ownerAddress.toLowerCase() === userAccount.toLowerCase());
+      // Check if owner
+      try {
+        const [, , , , , , tokenOwner] = await contractWithSigner.getTokenInfo();
+        setIsOwner(tokenOwner.toLowerCase() === userAccount.toLowerCase());
+      } catch (error) {
+        console.error("Error getting owner from getTokenInfo:", error);
+        setIsOwner(false);
+      }
       
       await loadBalance(userAccount, contractWithSigner);
       
@@ -567,8 +614,7 @@ const App = () => {
   const loadBalance = async (address, contractInstance) => {
     try {
       const balance = await contractInstance.balanceOf(address);
-      const decimals = await contractInstance.decimals();
-      const formattedBalance = ethers.formatUnits(balance, decimals);
+      const formattedBalance = ethers.formatUnits(balance, 4); // decimals = 4
       setBalance(formattedBalance);
     } catch (error) {
       console.error("Error loading balance:", error);
@@ -583,18 +629,21 @@ const App = () => {
       }
       
       setIsLoading(true);
-      const decimals = await contract.decimals();
-      const amount = ethers.parseUnits(transferAmount, decimals);
+      const amount = ethers.parseUnits(transferAmount, 4); // decimals = 4
       let recipientAddress = recipient;
       
       if (toOwner) {
-        recipientAddress = await contract.owner();
+        // Get owner from token info
+        const [, , , , , , tokenOwner] = await contract.getTokenInfo();
+        recipientAddress = tokenOwner;
       }
       
       if (!recipientAddress) {
         alert('Please enter recipient address');
         return;
       }
+      
+      console.log(`Transferring ${transferAmount} O2 to ${recipientAddress}`);
       
       const tx = await contract.transfer(recipientAddress, amount);
       await tx.wait();
@@ -630,7 +679,6 @@ const App = () => {
       })
       .catch(err => {
         console.error('Failed to copy: ', err);
-        // Fallback untuk browser lama
         const textArea = document.createElement('textarea');
         textArea.value = address;
         document.body.appendChild(textArea);
@@ -654,19 +702,16 @@ const App = () => {
       if (!amount) return;
       
       setIsLoading(true);
-      const decimals = await contract.decimals();
-      const mintAmount = ethers.parseUnits(amount, decimals);
+      const mintAmount = ethers.parseUnits(amount, 4); // decimals = 4
       
       const tx = await contract.mint(account, mintAmount);
       await tx.wait();
       
       alert('Mint successful!');
       
-      // Refresh data setelah mint
       await loadBalance(account, contract);
       await loadAllTokenHolders(contract);
       
-      // Refresh transaction history jika address yang ditrack adalah owner
       if (trackAddress && trackAddress.toLowerCase() === account.toLowerCase()) {
         await loadTransactionHistory(trackAddress);
       }
@@ -690,19 +735,16 @@ const App = () => {
       if (!amount) return;
       
       setIsLoading(true);
-      const decimals = await contract.decimals();
-      const burnAmount = ethers.parseUnits(amount, decimals);
+      const burnAmount = ethers.parseUnits(amount, 4); // decimals = 4
       
       const tx = await contract.burn(burnAmount);
       await tx.wait();
       
       alert('Burn successful!');
       
-      // Refresh data setelah burn
       await loadBalance(account, contract);
       await loadAllTokenHolders(contract);
       
-      // Refresh transaction history jika address yang ditrack adalah owner
       if (trackAddress && trackAddress.toLowerCase() === account.toLowerCase()) {
         await loadTransactionHistory(trackAddress);
       }
@@ -749,12 +791,10 @@ const App = () => {
     }
   };
 
-  // Fungsi untuk membuka blockchain explorer
   const openBlockchainExplorer = () => {
     window.open(BLOCKCHAIN_EXPLORER_URL, '_blank', 'noopener,noreferrer');
   };
 
-  // Fungsi untuk membuka transaksi di explorer
   const openTransactionInExplorer = (txHash) => {
     window.open(`https://eth-sepolia.blockscout.com/tx/${txHash}`, '_blank', 'noopener,noreferrer');
   };
@@ -797,7 +837,6 @@ const App = () => {
       <div className="App" style={{ display: showSplash ? 'none' : 'block' }}>
         <header className="App-header">
           <div className="header-left">
-            {/* Logo dan Title */}
             <div className="logo-title-container">
               <div className="logo-wrapper">
                 <img src={logo} alt="O2 Token Logo" className="logo" />
@@ -812,7 +851,6 @@ const App = () => {
               <p className="current-tagline">"{tagline}"</p>
             </div>
             
-            {/* Contract Address */}
             <div className="contract-address-container">
               <div className="contract-address-header">
                 <div className="contract-address-left">
@@ -913,7 +951,7 @@ const App = () => {
             </div>
           </section>
 
-          {/* Lacak Transaksi Section - BARU */}
+          {/* Lacak Transaksi Section */}
           <section className="track-transactions-section">
             <h2> Lacak Transaksi</h2>
             
@@ -1085,7 +1123,6 @@ const App = () => {
                       })}
                     </div>
                     
-                    {/* Tombol Show More/Less untuk transaksi */}
                     {hasMoreTransactions && (
                       <div className="show-more-transactions">
                         <button 
